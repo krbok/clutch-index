@@ -5,8 +5,8 @@ const rowsOf = (id) => { const g = D(id); return g.status === 'ok' && Array.isAr
 const N = (v) => (v === '' || v == null ? NaN : +v);
 const T = (v) => (v === '' || v == null || (typeof v === 'number' && isNaN(v)) ? '—' : String(v));
 const fmtInt = d3.format(',');
-const C = (i) => dash.colors[i % dash.colors.length];
-const MUTED = 'var(--cds-chart-muted)';
+const C = (i) => `var(--ci-s${i % 3}, ${dash.colors[i % dash.colors.length]})`;
+const MUTED = 'var(--chart-muted)';
 const srcOf = (role) => (role === 'bat' ? 'batters' : 'bowlers');
 const byRank = (r) => r.slice().sort((a, b) => N(a.rank) - N(b.rank));
 const el$ = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -84,7 +84,7 @@ dash.draw('tierchart', (el) => {
     data.forEach((d, j) => {
       const v = N(d[m[0]]), y = top + j * rh;
       g.append('text').attr('class', 'ci-t').attr('x', 0).attr('y', y + rh / 2 + 4).text(d.tier);
-      const bar = g.append('rect').datum(d).attr('x', Math.min(x(1), x(v))).attr('y', y + 4).attr('width', Math.max(1.5, Math.abs(x(v) - x(1)))).attr('height', rh - 8).attr('rx', 3).style('fill', v >= 1 ? C(0) : MUTED);
+      const bar = g.append('rect').datum(d).attr('x', Math.min(x(1), x(v))).attr('y', y + 4).attr('width', Math.max(1.5, Math.abs(x(v) - x(1)))).attr('height', rh - 8).attr('rx', 4).style('fill', v >= 1 ? C(0) : MUTED);
       hover(bar, tip, el, () => [`${m[1]}: ${d.tier}`, `${v.toFixed(2)} times the rate on ordinary balls`, `${fmtInt(N(d.balls))} balls in this tier`]);
       g.append('text').attr('class', 'ci-tv').attr('x', Math.max(x(v), x(1)) + 6).attr('y', y + rh / 2 + 4).text(v.toFixed(2));
     });
@@ -103,7 +103,7 @@ dash.draw('heat', (el) => {
     const g = svg.append('g').attr('transform', `translate(${(i % cols) * (pw + gap)},${Math.floor(i / cols) * (ph + 12)})`);
     g.append('text').attr('class', 'ci-tt').attr('x', ml).attr('y', 13).text(p);
     const cells = g.selectAll('rect').data(data.filter((d) => d.innings_n === p)).join('rect')
-      .attr('x', (d) => ml + (N(d.overid) - 1) * cw + 1).attr('y', (d) => mt + N(d.wk_before) * ch + 1).attr('width', Math.max(1, cw - 2)).attr('height', ch - 2).attr('rx', 2)
+      .attr('x', (d) => ml + (N(d.overid) - 1) * cw + 1).attr('y', (d) => mt + N(d.wk_before) * ch + 1).attr('width', Math.max(1, cw - 2)).attr('height', ch - 2).attr('rx', 4)
       .style('fill', C(0)).style('fill-opacity', (d) => op(N(d.pi)));
     hover(cells, tip, el, (d) => [`${p}: over ${d.overid}, ${d.wk_before} down`, `Average Pressure Index ${N(d.pi).toFixed(0)}`, `${fmtInt(N(d.balls))} balls`]);
     [1, 5, 10, 15, 20].forEach((o) => g.append('text').attr('class', 'ci-t').attr('text-anchor', 'middle').attr('x', ml + (o - 0.5) * cw).attr('y', mt + 10 * ch + 15).text(o));
@@ -235,7 +235,16 @@ dash.draw('scatter', (el) => {
   const pts = data.map((d) => ({ d, px: x(N(d[fx])), py: y(N(d[fy])), top: N(d.rank) <= 10 })).sort((a, b) => a.top - b.top);
   svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (p) => p.px).attr('cy', (p) => p.py).attr('r', (p) => (p.top ? 6 : 4))
     .style('fill', (p) => (p.top ? C(0) : MUTED)).style('fill-opacity', (p) => (p.top ? 1 : 0.75)).style('stroke', 'var(--color-bg)').style('stroke-width', (p) => (p.top ? 2 : 1));
-  pts.filter((p) => N(p.d.rank) <= 4).forEach((p) => svg.append('text').attr('class', 'ci-tv').attr('x', p.px + 9).attr('y', p.py + 4).text(p.d.name));
+  const placed = [{ x0: ml, x1: ml + 150, y0: mt - 4, y1: mt + 16 }]; // the axis caption in the top-left corner
+  pts.filter((p) => N(p.d.rank) <= 4).sort((a, b) => N(a.d.rank) - N(b.d.rank)).forEach((p) => {
+    // a name goes to the right of its dot, or to the left when it would run off the chart or onto another name; if neither fits, pointing at the dot still names it
+    const lw = p.d.name.length * 7;
+    const spot = [false, true].map((left) => ({ left, x0: left ? p.px - 9 - lw : p.px + 9, x1: left ? p.px - 9 : p.px + 9 + lw, y0: p.py - 9, y1: p.py + 9 }))
+      .find((b) => b.x0 >= ml && b.x1 <= w && !placed.some((q) => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0));
+    if (!spot) return;
+    placed.push(spot);
+    svg.append('text').attr('class', 'ci-tv').attr('text-anchor', spot.left ? 'end' : 'start').attr('x', spot.left ? spot.x1 : spot.x0).attr('y', p.py + 4).text(p.d.name);
+  });
   const ring = svg.append('circle').attr('r', 9).style('fill', 'none').style('stroke', 'var(--color-fg)').style('stroke-width', 1.5).style('display', 'none');
   svg.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', H).style('fill', 'transparent')
     .on('pointermove', (ev) => {
@@ -297,8 +306,8 @@ dash.draw('splits', (el) => {
     gdef[2].map((s) => mine.find((d) => d.grp === gdef[0] && d.split === s)).filter(Boolean).forEach((d, j) => {
       const y = top + j * rh, a = N(d.rate), e = N(d.xrate);
       g.append('text').attr('class', 'ci-t').attr('x', 0).attr('y', y + 17).text(NAME[d.split] || d.split);
-      g.append('rect').attr('x', lab).attr('y', y + 3).attr('width', Math.max(1.5, x(a) - lab)).attr('height', 11).attr('rx', 3).style('fill', C(0));
-      g.append('rect').attr('x', lab).attr('y', y + 16).attr('width', Math.max(1.5, x(e) - lab)).attr('height', 11).attr('rx', 3).style('fill', MUTED);
+      g.append('rect').attr('x', lab).attr('y', y + 3).attr('width', Math.max(1.5, x(a) - lab)).attr('height', 11).attr('rx', 4).style('fill', C(0));
+      g.append('rect').attr('x', lab).attr('y', y + 16).attr('width', Math.max(1.5, x(e) - lab)).attr('height', 11).attr('rx', 4).style('fill', MUTED);
       g.append('text').attr('class', 'ci-tv').attr('x', x(a) + 6).attr('y', y + 13).text(f(a));
       g.append('text').attr('class', 'ci-t').attr('x', x(e) + 6).attr('y', y + 26).text(f(e));
       hover(g.append('rect').attr('x', 0).attr('y', y).attr('width', pw).attr('height', rh - 4).style('fill', 'transparent'), tip, el,
@@ -319,7 +328,7 @@ dash.draw('strip', (el) => {
     svg.append('text').attr('class', 'ci-t').attr('text-anchor', 'end').attr('x', ml - 8).attr('y', y(t) + 4).text((t > 0 ? '+' : '') + t.toFixed(0));
   });
   const bars = svg.append('g').selectAll('rect').data(data).join('rect').attr('x', (d, i) => x(i)).attr('width', Math.max(1, x.bandwidth()))
-    .attr('y', (d) => Math.min(y(0), y(N(d.value)))).attr('height', (d) => Math.max(1, Math.abs(y(N(d.value)) - y(0)))).attr('rx', Math.min(2, x.bandwidth() / 2))
+    .attr('y', (d) => Math.min(y(0), y(N(d.value)))).attr('height', (d) => Math.max(1, Math.abs(y(N(d.value)) - y(0)))).attr('rx', Math.min(4, x.bandwidth() / 2))
     .style('fill', (d) => (N(d.value) >= 0 ? C(0) : MUTED));
   hover(bars, tip, el, (d) => [`${d.date} v ${d.vs}`, d.comp, d.line, `${N(d.value) >= 0 ? '+' : ''}${N(d.value).toFixed(1)} runs against average, pressure-weighted`, `${d.p_balls} pressure balls`]);
   svg.append('text').attr('class', 'ci-t').attr('x', ml).attr('y', H - 6).text(data[0].date.slice(0, 7));

@@ -116,3 +116,9 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);f
 #bat-table td:nth-child(4),#bowl-table td:nth-child(4){white-space:normal;max-width:200px;min-width:120px;font-size:12px;line-height:1.3;color:var(--ink-2)}
 #bat-table td:nth-child(3),#bowl-table td:nth-child(3){font-weight:600}
 .ci-scroll{scrollbar-width:thin}
+
+/* dropdowns: own chevron with room on both sides, instead of the browser's cramped default */
+.dash-select{-webkit-appearance:none;appearance:none;padding:0 36px 0 12px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5 6 6l4.5-4.5' fill='none' stroke='%237b8190' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;background-size:12px 8px;cursor:pointer;text-overflow:ellipsis}
+
+/* a link that opens a tab directly must not land its heading under the sticky tab bar */
+.ci-page{scroll-margin-top:60px}
